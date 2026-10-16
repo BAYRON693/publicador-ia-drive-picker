@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Publicador IA · Google Drive</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #f4f7fb;
+        color: #18202a;
+      }
+      main {
+        max-width: 680px;
+        margin: 10vh auto;
+        padding: 24px;
+      }
+      .card {
+        background: white;
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow: 0 12px 35px #10203018;
+      }
+      button {
+        background: #1667d9;
+        color: white;
+        border: 0;
+        border-radius: 12px;
+        padding: 13px 18px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      small {
+        color: #667085;
+      }
+      .error {
+        color: #b42318;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="card">
+        <h1>Selecciona tu Excel</h1>
+        <p>
+          Se abrirá el selector oficial de Google. El bot guardará únicamente el
+          identificador del archivo elegido.
+        </p>
+        <button id="open" disabled>Preparando selector…</button>
+        <p id="status"><small>La autorización vence pronto.</small></p>
+      </section>
+    </main>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script>
+      const apiBase =
+        "https://lahrjewmbjnhmsnpxwhp.supabase.co/functions/v1/google-drive-oauth";
+      const params = new URLSearchParams(location.search);
+      const state = params.get("state") || "";
+      const initialError = params.get("error") || "";
+      history.replaceState({}, document.title, location.pathname);
+      const button = document.querySelector("#open");
+      const status = document.querySelector("#status");
+      let session = null;
+
+      function fail(message) {
+        status.className = "error";
+        status.textContent = message;
+        button.disabled = true;
+        button.textContent = "Vuelve a Telegram y usa /drive";
+      }
+
+      async function prepare() {
+        if (initialError)
+          return fail(`No se completó la conexión: ${initialError}`);
+        if (!state) return fail("La autorización no es válida o ya venció.");
+        const response = await fetch(
+          `${apiBase}/picker-session?state=${encodeURIComponent(state)}`,
+          {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          },
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok)
+          return fail(result.message || "No se pudo preparar Google Drive.");
+        session = result;
+        button.disabled = false;
+        button.textContent = "Elegir archivo .xlsx";
+      }
+
+      button.addEventListener("click", () => {
+        if (!session) return;
+        button.disabled = true;
+        status.textContent = "Abriendo Google Drive…";
+        gapi.load("picker", () => {
+          const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+            .setMimeTypes(session.mimeType)
+            .setIncludeFolders(false);
+          new google.picker.PickerBuilder()
+            .setOAuthToken(session.token)
+            .setDeveloperKey(session.apiKey)
+            .addView(view)
+            .setCallback(async (data) => {
+              if (data.action === google.picker.Action.CANCEL) {
+                button.disabled = false;
+                status.textContent =
+                  "Selección cancelada. Puedes intentarlo otra vez.";
+              }
+              if (data.action !== google.picker.Action.PICKED) return;
+              status.textContent = "Validando el archivo…";
+              const response = await fetch(session.selectUrl, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  state: session.state,
+                  fileId: data.docs[0].id,
+                }),
+              });
+              const result = await response.json().catch(() => ({}));
+              status.textContent = result.message || "Proceso terminado.";
+              if (!result.ok) button.disabled = false;
+              if (result.ok) setTimeout(() => window.close(), 2500);
+            })
+            .build()
+            .setVisible(true);
+        });
+      });
+
+      prepare().catch(() =>
+        fail(
+          "No se pudo preparar Google Drive. Vuelve a Telegram y usa /drive.",
+        ),
+      );
+    </script>
+  </body>
+</html>
