@@ -94,7 +94,7 @@
           return fail(result.message || "No se pudo preparar Google Drive.");
         session = result;
         button.disabled = false;
-        button.textContent = "Elegir archivo .xlsx";
+        button.textContent = "Explorar mi Google Drive";
       }
 
       button.addEventListener("click", () => {
@@ -102,9 +102,12 @@
         button.disabled = true;
         status.textContent = "Abriendo Google Drive…";
         gapi.load("picker", () => {
+          // Show the complete Drive hierarchy so the user can navigate through
+          // folders and recognize every file. The backend still validates that
+          // the final selection is a compatible Excel workbook before saving it.
           const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-            .setMimeTypes(session.mimeType)
-            .setIncludeFolders(false);
+            .setIncludeFolders(true)
+            .setSelectFolderEnabled(false);
           new google.picker.PickerBuilder()
             .setOAuthToken(session.token)
             .setDeveloperKey(session.apiKey)
