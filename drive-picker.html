@@ -108,6 +108,7 @@
           new google.picker.PickerBuilder()
             .setOAuthToken(session.token)
             .setDeveloperKey(session.apiKey)
+            .setAppId(session.appId)
             .addView(view)
             .setCallback(async (data) => {
               if (data.action === google.picker.Action.CANCEL) {
