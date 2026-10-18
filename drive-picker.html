@@ -50,8 +50,8 @@
   <body>
     <main>
       <section class="card">
-        <h1>Selecciona tu Excel</h1>
-        <p>
+        <h1 id="title">Selecciona tu Excel</h1>
+        <p id="description">
           Se abrirá el selector oficial de Google. El bot guardará únicamente el
           identificador del archivo elegido.
         </p>
@@ -93,6 +93,12 @@
         if (!response.ok || !result.ok)
           return fail(result.message || "No se pudo preparar Google Drive.");
         session = result;
+        if (session.selectionTarget === "folder") {
+          document.querySelector("#title").textContent =
+            "Selecciona una carpeta de PDF";
+          document.querySelector("#description").textContent =
+            "El bot guardará únicamente el identificador de la carpeta elegida. No procesará archivos antiguos ni escribirá observaciones hasta que lo confirmes en Telegram.";
+        }
         button.disabled = false;
         button.textContent = "Explorar mi Google Drive";
       }
@@ -105,9 +111,14 @@
           // Show the complete Drive hierarchy so the user can navigate through
           // folders and recognize every file. The backend still validates that
           // the final selection is a compatible Excel workbook before saving it.
-          const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+          const selectingFolder = session.selectionTarget === "folder";
+          const view = new google.picker.DocsView(
+            selectingFolder
+              ? google.picker.ViewId.FOLDERS
+              : google.picker.ViewId.DOCS,
+          )
             .setIncludeFolders(true)
-            .setSelectFolderEnabled(false);
+            .setSelectFolderEnabled(selectingFolder);
           new google.picker.PickerBuilder()
             .setOAuthToken(session.token)
             .setDeveloperKey(session.apiKey)
